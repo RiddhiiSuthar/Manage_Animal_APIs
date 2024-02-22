@@ -1,7 +1,4 @@
-from datetime import datetime
-from typing import List
 from pydantic import BaseModel, validator
-
 
 class city(BaseModel):
     name: str
@@ -17,6 +14,3 @@ class dog(BaseModel):
         if not isinstance(v, float):
             raise ValueError("bark_decibels must be a double")
         return v
-    
-class city_cat(BaseModel):
-    pass

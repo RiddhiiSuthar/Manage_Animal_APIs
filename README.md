@@ -65,7 +65,6 @@ cd Manage_Animal_APIs
 3. Create Virtual environment and Activate:
 
 ```
-# 
 # Create virtual environment
 python -m venv venv
 
