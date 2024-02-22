@@ -92,7 +92,7 @@ cd app
 uvicorn main:app --reload
 ```
 
-The APIs will be available at `http://localhost:8000/doc`.
+The APIs will be available at `http://localhost:8000/docs`.
 
 
 ### Base URL
