@@ -1,6 +1,5 @@
 import uuid
 
-from database import engine
 from sqlalchemy import Column, Float, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
@@ -48,17 +47,3 @@ class Dog(Animal):
 
     __mapper_args__ = {"polymorphic_identity": "dog"}
 
-
-# Define the predefined list of cities
-PREDEFINED_CITIES = ["Frankfurt", "Berlin", "Hamburg", "Munich", "Cologne"]
-# Add predefined cities to the database if they don't exist
-with engine.connect() as conn:
-    for city_name in PREDEFINED_CITIES:
-        # Check if the city already exists in the table
-        existing_city = conn.execute(
-            City.__table__.select().where(City.name == city_name)
-        ).fetchone()
-        if not existing_city:
-            city_id = str(uuid.uuid4())
-            city = City(id=city_id, name=city_name)
-            conn.execute(City.__table__.insert().values(id=city_id, name=city_name))

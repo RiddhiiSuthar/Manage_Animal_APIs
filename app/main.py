@@ -1,13 +1,12 @@
 from uuid import UUID
 
 import models
-from database import engine, get_db
+from database import get_db
 from fastapi import Depends, FastAPI, HTTPException
 from schemas import cat, dog
-from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -44,8 +43,7 @@ def update_cat(cat_id: UUID, cat: cat, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cat not found")
 
     # Update the cat's information
-    for key, value in cat.dict().items():
-        setattr(cat_in_db, key, value)
+    cat_in_db.favorite_fish = cat.favorite_fish
 
     db.commit()
     db.refresh(cat_in_db)
@@ -90,16 +88,14 @@ def create_cats_in_city(city_name, cat: cat, db: Session = Depends(get_db)):
     )
 
     if db_cat:
-        for key, value in cat.dict().items():
-            setattr(db_cat, key, value)
-        setattr(db_cat, "city_id", city.id)
+        db_cat.city_id = city.id
         db.commit()
         db.refresh(db_cat)
         return db_cat
     else:
         new_cat = models.Cat(**cat.dict())
         db.add(new_cat)
-        setattr(new_cat, "city_id", city.id)
+        new_cat.city_id = city.id
         db.commit()
         db.refresh(new_cat)
         return new_cat
@@ -117,8 +113,8 @@ def update_cat_in_city(
     if db_cat is None:
         raise HTTPException(status_code=404, detail="Cat not found in this city")
 
-    for key, value in cat.dict().items():
-        setattr(db_cat, key, value)
+    db_cat.favorite_fish = cat.favorite_fish
+    db_cat.city_id = city.id
 
     db.commit()
     db.refresh(db_cat)
@@ -166,8 +162,7 @@ def update_dog(dog_id: UUID, dog: dog, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Dog not found")
 
     # Update the dog's information
-    for key, value in dog.dict().items():
-        setattr(dog_in_db, key, value)
+    dog_in_db.bark_decibels = dog.bark_decibels
 
     db.commit()
     db.refresh(dog_in_db)
@@ -207,20 +202,18 @@ def create_dogs_in_city(city_name, dog: dog, db: Session = Depends(get_db)):
 
     db_dog = (
         db.query(models.Dog)
-        .filter_by(bark_decibels=dog.dict().get("bark_decibels"))
+        .filter_by(bark_decibels=dog.bark_decibels)
         .first()
     )
     if db_dog:
-        for key, value in dog.dict().items():
-            setattr(db_dog, key, value)
-        setattr(db_dog, "city_id", city.id)
+        db_dog.city_id = city.id
         db.commit()
         db.refresh(db_dog)
         return db_dog
     else:
         new_dog = models.Dog(**dog.dict())
         db.add(new_dog)
-        setattr(new_dog, "city_id", city.id)
+        new_dog.city_id = city.id
         db.commit()
         db.refresh(new_dog)
         return new_dog
@@ -238,8 +231,8 @@ def update_dog_in_city(
     if db_dog is None:
         raise HTTPException(status_code=404, detail="Dog not found in this city")
 
-    for key, value in dog.dict().items():
-        setattr(db_dog, key, value)
+    db_dog.bark_decibels = dog.bark_decibels
+    db_dog.city_id = city.id
 
     db.commit()
     db.refresh(db_dog)
@@ -265,34 +258,49 @@ def delete_dog_in_city(city_name, dog_id: UUID, db: Session = Depends(get_db)):
 
 @app.get("/stats/cats/")
 def cat_statistics(db: Session = Depends(get_db)):
-    stats = (
-        db.query(
-            models.City.id, models.City.name, func.count(models.Cat.id).label("total")
-        )
-        .outerjoin(models.Cat)
-        .group_by(models.City.id)
-        .all()
-    )
+
+    query = """
+        SELECT 
+        cities.id,
+        cities.name AS city_name,
+        COALESCE(COUNT(cats.id), 0) AS cat_count
+        FROM 
+            cities
+        LEFT JOIN 
+            animals ON cities.id = animals.city_id
+        LEFT JOIN 
+            cats ON animals.id = cats.id
+        GROUP BY 
+            cities.id, cities.name;
+
+    """
+    stats = db.execute(query).fetchall()
     return [
-        {"id": city_id, "name": name, "total": total} for city_id, name, total in stats
-    ]
+            {"id": row[0], "name": row[1], "total": row[2]}
+            for row in stats
+        ]
 
 
 @app.get("/stats/dogs/")
 def dog_statistics(db: Session = Depends(get_db)):
-    stats = (
-        db.query(
-            models.City.id,
-            models.City.name,
-            models.Dog.breed,
-            func.max(models.Dog.bark_decibels).label("decibels"),
-        )
-        .outerjoin(models.Dog)
-        .group_by(models.City.id, models.Animal.breed)
-        .all()
-    )
-
-    return [
+    query = text("""
+        SELECT
+        cities.id,
+        cities.name AS city_name,
+        breed,
+        COALESCE(MAX(bark_decibels), 0) AS max_bark_decibels
+        FROM
+            cities
+        LEFT JOIN 
+            animals ON cities.id = animals.city_id
+        LEFT JOIN 
+            dogs ON animals.id = dogs.id
+        GROUP BY 
+            cities.id, cities.name, breed;
+    """)
+    stats = db.execute(query).fetchall()
+    
+    return  [
         {"id": city_id, "name": name, "animal_breed": breed, "decibels": decibels}
         for city_id, name, breed, decibels in stats
     ]
