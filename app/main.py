@@ -296,7 +296,7 @@ def dog_statistics(db: Session = Depends(get_db)):
         LEFT JOIN 
             dogs ON animals.id = dogs.id
         GROUP BY 
-            cities.id, cities.name, breed;
+            cities.id, cities.name, breed, bark_decibels;
     """)
     stats = db.execute(query).fetchall()
     
