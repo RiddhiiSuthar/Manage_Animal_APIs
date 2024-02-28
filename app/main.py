@@ -284,7 +284,7 @@ def cat_statistics(db: Session = Depends(get_db)):
 @app.get("/stats/dogs/")
 def dog_statistics(db: Session = Depends(get_db)):
     query = text("""
-        SELECT
+        SELECT DISTINCT ON (cities.name)
         cities.id,
         cities.name AS city_name,
         breed,
